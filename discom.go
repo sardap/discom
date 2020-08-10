@@ -10,13 +10,13 @@ import (
 )
 
 //CommandHandler CommandHandler
-type CommandHandler func(*discordgo.Session, *discordgo.Message)
+type CommandHandler func(*discordgo.Session, *discordgo.MessageCreate)
 
 //Command Command
 type Command struct {
-	Re              *regexp.Regexp
-	Handler         CommandHandler
-	Description     string
+	Re          *regexp.Regexp
+	Handler     CommandHandler
+	Description string
 }
 
 //CommandSet CommandSet
@@ -35,7 +35,7 @@ func init() {
 }
 
 func (c *Command) complete() bool {
-	return c.Re != nil && c.Handler != nil
+	return c.Re != nil && c.Handler != nil && c.Re.String() != ""
 }
 
 //CreateCommandSet CreateCommandSet
@@ -59,6 +59,7 @@ func cleanPattern(pattern string) string {
 
 func (cs *CommandSet) getHelpMessage() string {
 	var result strings.Builder
+	fmt.Fprintf(&result, "here are all the commands I know\n")
 	for _, com := range cs.commands {
 		var desc string
 		if com.Description != "" {
@@ -76,7 +77,11 @@ func (cs *CommandSet) getHelpMessage() string {
 }
 
 //Handler Handler
-func (cs *CommandSet) Handler(s *discordgo.Session, m *discordgo.Message) {
+func (cs *CommandSet) Handler(s *discordgo.Session, m *discordgo.MessageCreate) {
+	if m.Author.ID == s.State.User.ID {
+		return
+	}
+
 	msg := m.Content
 	if cs.CaseInsensitive {
 		msg = strings.ToLower(msg)
@@ -100,10 +105,13 @@ func (cs *CommandSet) Handler(s *discordgo.Session, m *discordgo.Message) {
 		res = fmt.Sprintf("unknown command try \"%s help\"", cs.PrefixRe.String())
 	}
 
-	cs.replyMessage(m, res)
+	s.ChannelMessageSend(
+		m.ChannelID,
+		cs.replyMessage(m, res),
+	)
 
 }
 
-func (cs *CommandSet) replyMessage(m *discordgo.Message, response string) string {
+func (cs *CommandSet) replyMessage(m *discordgo.MessageCreate, response string) string {
 	return fmt.Sprintf("<@%s> %s", m.Author.ID, response)
 }
