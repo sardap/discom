@@ -17,13 +17,14 @@ type Command struct {
 	Re          *regexp.Regexp
 	Handler     CommandHandler
 	Description string
+	Example     string
+	CaseSense   bool
 }
 
 //CommandSet CommandSet
 type CommandSet struct {
-	CaseInsensitive bool
-	PrefixRe        *regexp.Regexp
-	commands        []Command
+	PrefixRe *regexp.Regexp
+	commands []Command
 }
 
 var (
@@ -39,8 +40,8 @@ func (c *Command) complete() bool {
 }
 
 //CreateCommandSet CreateCommandSet
-func CreateCommandSet(CaseInsensitive bool, prefixRe *regexp.Regexp) *CommandSet {
-	return &CommandSet{CaseInsensitive, prefixRe, make([]Command, 0)}
+func CreateCommandSet(prefixRe *regexp.Regexp) *CommandSet {
+	return &CommandSet{prefixRe, make([]Command, 0)}
 }
 
 //AddCommand AddCommand
@@ -67,9 +68,17 @@ func (cs *CommandSet) getHelpMessage() string {
 		} else {
 			desc = "missing description"
 		}
+
+		var example string
+		if com.Example != "" {
+			example = com.Example
+		} else {
+			example = cleanPattern(com.Re.String())
+		}
+
 		fmt.Fprintf(
-			&result, "\"%s %s\" %s\n\n",
-			cleanPattern(cs.PrefixRe.String()), cleanPattern(com.Re.String()), desc,
+			&result, "\"%s %s\" Case sensitive? %t %s\n\n",
+			cleanPattern(cs.PrefixRe.String()), example, com.CaseSense, desc,
 		)
 	}
 
@@ -83,16 +92,18 @@ func (cs *CommandSet) Handler(s *discordgo.Session, m *discordgo.MessageCreate) 
 	}
 
 	msg := m.Content
-	if cs.CaseInsensitive {
-		msg = strings.ToLower(msg)
-	}
 
 	if !cs.PrefixRe.Match([]byte(msg)) {
 		return
 	}
 
 	for _, com := range cs.commands {
-		if com.Re.Match([]byte(msg)) {
+		tmpMsg := msg
+		if com.CaseSense {
+			tmpMsg = strings.ToLower(msg)
+		}
+
+		if com.Re.Match([]byte(tmpMsg)) {
 			com.Handler(s, m)
 			return
 		}
