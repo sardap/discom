@@ -18,7 +18,7 @@ type Command struct {
 	Handler     CommandHandler
 	Description string
 	Example     string
-	CaseInSense   bool
+	CaseInSense bool
 }
 
 //CommandSet CommandSet
@@ -77,7 +77,7 @@ func (cs *CommandSet) getHelpMessage() string {
 		}
 
 		fmt.Fprintf(
-			&result, "\"%s %s\" Case sensitive? %t %s\n\n",
+			&result, "\"%s %s\" Case sensitive? %t, %s\n\n",
 			cleanPattern(cs.PrefixRe.String()), example, com.CaseInSense, desc,
 		)
 	}
