@@ -9,19 +9,23 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-//CommandHandler CommandHandler
+//CommandHandler A callback function which is triggered when a command is ran
 type CommandHandler func(*discordgo.Session, *discordgo.MessageCreate)
 
-//Command Command
+//Command Represents a Command to the discord bot.
 type Command struct {
-	Re              *regexp.Regexp
-	Handler         CommandHandler
-	Description     string
-	Example         string
+	//Re the regex pattern when a message matches it will call the Handler func
+	Re *regexp.Regexp
+	//CaseInsensitive will to lower the incomming message before checking if it matches
 	CaseInsensitive bool
+	//Handler The handler function which is called on a message matching the regex
+	Handler     CommandHandler
+	Description string
+	Example     string
 }
 
-//CommandSet CommandSet
+//CommandSet Use this to regsiter commands and get the handler to pass to discordgo.
+// This should be created with CreateCommandSet.
 type CommandSet struct {
 	PrefixRe *regexp.Regexp
 	commands []Command
@@ -39,12 +43,16 @@ func (c *Command) complete() bool {
 	return c.Re != nil && c.Handler != nil && c.Re.String() != ""
 }
 
-//CreateCommandSet CreateCommandSet
+//CreateCommandSet Creates a command set
 func CreateCommandSet(prefixRe *regexp.Regexp) *CommandSet {
 	return &CommandSet{prefixRe, make([]Command, 0)}
 }
 
-//AddCommand AddCommand
+func cleanPattern(pattern string) string {
+	return strings.ReplaceAll(pattern, "\\", "")
+}
+
+//AddCommand Use this to add a command to a command set
 func (cs *CommandSet) AddCommand(com Command) error {
 	if !com.complete() {
 		return errors.New("Must set all fields in command struct")
@@ -54,38 +62,7 @@ func (cs *CommandSet) AddCommand(com Command) error {
 	return nil
 }
 
-func cleanPattern(pattern string) string {
-	return strings.ReplaceAll(pattern, "\\", "")
-}
-
-func (cs *CommandSet) getHelpMessage() string {
-	var result strings.Builder
-	fmt.Fprintf(&result, "here are all the commands I know\n")
-	for _, com := range cs.commands {
-		var desc string
-		if com.Description != "" {
-			desc = com.Description
-		} else {
-			desc = "missing description"
-		}
-
-		var example string
-		if com.Example != "" {
-			example = com.Example
-		} else {
-			example = cleanPattern(com.Re.String())
-		}
-
-		fmt.Fprintf(
-			&result, "\"%s %s\" Case Broken? %t, %s\n\n",
-			cleanPattern(cs.PrefixRe.String()), example, com.CaseInsensitive, desc,
-		)
-	}
-
-	return result.String()
-}
-
-//Handler Handler
+//Handler Regsiter this with discordgo.AddHandler will be called every time a new message is sent on a guild.
 func (cs *CommandSet) Handler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return
@@ -121,6 +98,33 @@ func (cs *CommandSet) Handler(s *discordgo.Session, m *discordgo.MessageCreate) 
 		cs.replyMessage(m, res),
 	)
 
+}
+
+func (cs *CommandSet) getHelpMessage() string {
+	var result strings.Builder
+	fmt.Fprintf(&result, "here are all the commands I know\n")
+	for _, com := range cs.commands {
+		var desc string
+		if com.Description != "" {
+			desc = com.Description
+		} else {
+			desc = "missing description"
+		}
+
+		var example string
+		if com.Example != "" {
+			example = com.Example
+		} else {
+			example = cleanPattern(com.Re.String())
+		}
+
+		fmt.Fprintf(
+			&result, "\"%s %s\" Case Insensitive? %t, %s\n\n",
+			cleanPattern(cs.PrefixRe.String()), example, com.CaseInsensitive, desc,
+		)
+	}
+
+	return result.String()
 }
 
 func (cs *CommandSet) replyMessage(m *discordgo.MessageCreate, response string) string {
