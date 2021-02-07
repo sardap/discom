@@ -77,7 +77,7 @@ func (cs *CommandSet) getHelpMessage() string {
 		}
 
 		fmt.Fprintf(
-			&result, "\"%s %s\" Case Insensitive? %t, %s\n\n",
+			&result, "\"%s %s\" Case Broken? %t, %s\n\n",
 			cleanPattern(cs.PrefixRe.String()), example, com.CaseInsensitive, desc,
 		)
 	}
