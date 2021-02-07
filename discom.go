@@ -14,11 +14,11 @@ type CommandHandler func(*discordgo.Session, *discordgo.MessageCreate)
 
 //Command Command
 type Command struct {
-	Re          *regexp.Regexp
-	Handler     CommandHandler
-	Description string
-	Example     string
-	CaseInSense bool
+	Re              *regexp.Regexp
+	Handler         CommandHandler
+	Description     string
+	Example         string
+	CaseInsensitive bool
 }
 
 //CommandSet CommandSet
@@ -77,8 +77,8 @@ func (cs *CommandSet) getHelpMessage() string {
 		}
 
 		fmt.Fprintf(
-			&result, "\"%s %s\" Case sensitive? %t, %s\n\n",
-			cleanPattern(cs.PrefixRe.String()), example, com.CaseInSense, desc,
+			&result, "\"%s %s\" Case Insensitive? %t, %s\n\n",
+			cleanPattern(cs.PrefixRe.String()), example, com.CaseInsensitive, desc,
 		)
 	}
 
@@ -99,7 +99,7 @@ func (cs *CommandSet) Handler(s *discordgo.Session, m *discordgo.MessageCreate) 
 
 	for _, com := range cs.commands {
 		tmpMsg := msg
-		if com.CaseInSense {
+		if com.CaseInsensitive {
 			tmpMsg = strings.ToLower(msg)
 		}
 

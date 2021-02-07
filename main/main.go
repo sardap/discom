@@ -21,7 +21,7 @@ var (
 
 func init() {
 	discToken = strings.Replace(os.Getenv("DISCORD_AUTH"), "\"", "", -1)
-	commandSet = discom.CreateCommandSet(false, regexp.MustCompile(prefixPattern))
+	commandSet = discom.CreateCommandSet(regexp.MustCompile(prefixPattern))
 
 	commandSet.AddCommand(discom.Command{
 		Re: regexp.MustCompile("say hi"), Handler: hiCommandHandler,
