@@ -21,24 +21,35 @@ var (
 
 func init() {
 	discToken = strings.Replace(os.Getenv("DISCORD_AUTH"), "\"", "", -1)
-	commandSet = discom.CreateCommandSet(regexp.MustCompile(prefixPattern))
+	commandSet = discom.CreateCommandSet(regexp.MustCompile(prefixPattern), errorHandler)
 
 	commandSet.AddCommand(discom.Command{
-		Re: regexp.MustCompile("say hi"), Handler: hiCommandHandler,
+		Name: "say hi", Handler: hiCommandHandler,
 		Description: "says hi",
 	})
 
 	commandSet.AddCommand(discom.Command{
-		Re: regexp.MustCompile("say bye"), Handler: hiCommandHandler,
+		Name: "say_bye", Handler: hiCommandHandler,
 		Description: "says bye",
 	})
 }
 
-func hiCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
+func errorHandler(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
+	s.ChannelMessageSend(
+		m.ChannelID,
+		fmt.Sprintf(
+			"<@%s> invalid command:\"%s\" error:%s",
+			m.Author.ID, m.Content, err,
+		),
+	)
+}
+
+func hiCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate, args ...string) error {
 	s.ChannelMessageSend(
 		m.ChannelID,
 		fmt.Sprintf("<@%s> Hi", m.Author.ID),
 	)
+	return nil
 }
 
 func main() {
@@ -68,5 +79,4 @@ func main() {
 
 	// Cleanly close down the Discord session.
 	discord.Close()
-
 }
