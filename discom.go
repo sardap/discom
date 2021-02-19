@@ -10,12 +10,16 @@ import (
 )
 
 //CommandHandler A callback function which is triggered when a command is ran
-type CommandHandler func(*discordgo.Session, *discordgo.MessageCreate)
+//Error should only return data your fine with the user seeing
+type CommandHandler func(*discordgo.Session, *discordgo.MessageCreate, ...string) error
+
+//ErrorHandler called if a command handler returns an error
+type ErrorHandler func(*discordgo.Session, *discordgo.MessageCreate, error)
 
 //Command Represents a Command to the discord bot.
 type Command struct {
-	//Re the regex pattern when a message matches it will call the Handler func
-	Re *regexp.Regexp
+	//Name the name of the command commands should not have spaces
+	Name string
 	//CaseInsensitive will to lower the incomming message before checking if it matches
 	CaseInsensitive bool
 	//Handler The handler function which is called on a message matching the regex
@@ -27,8 +31,9 @@ type Command struct {
 //CommandSet Use this to regsiter commands and get the handler to pass to discordgo.
 // This should be created with CreateCommandSet.
 type CommandSet struct {
-	PrefixRe *regexp.Regexp
-	commands []Command
+	PrefixRe     *regexp.Regexp
+	ErrorHandler ErrorHandler
+	commands     []Command
 }
 
 var (
@@ -40,12 +45,16 @@ func init() {
 }
 
 func (c *Command) complete() bool {
-	return c.Re != nil && c.Handler != nil && c.Re.String() != ""
+	return c.Name != "" && c.Handler != nil
 }
 
 //CreateCommandSet Creates a command set
-func CreateCommandSet(prefixRe *regexp.Regexp) *CommandSet {
-	return &CommandSet{prefixRe, make([]Command, 0)}
+func CreateCommandSet(prefixRe *regexp.Regexp, errorHandler ErrorHandler) *CommandSet {
+	return &CommandSet{
+		PrefixRe:     prefixRe,
+		ErrorHandler: errorHandler,
+		commands:     []Command{},
+	}
 }
 
 func cleanPattern(pattern string) string {
@@ -74,14 +83,31 @@ func (cs *CommandSet) Handler(s *discordgo.Session, m *discordgo.MessageCreate) 
 		return
 	}
 
+	msg = string(cs.PrefixRe.ReplaceAll([]byte(msg), []byte("")))
+
+	args := strings.Split(msg[1:], " ")
+	if len(args) < 1 {
+		s.ChannelMessageSend(
+			m.ChannelID,
+			cs.replyMessage(m, "Missing command argument"),
+		)
+		return
+	}
+
 	for _, com := range cs.commands {
-		tmpMsg := msg
+		tmpMsg := args[0]
 		if com.CaseInsensitive {
-			tmpMsg = strings.ToLower(msg)
+			tmpMsg = strings.ToLower(tmpMsg)
 		}
 
-		if com.Re.Match([]byte(tmpMsg)) {
-			com.Handler(s, m)
+		if tmpMsg == com.Name {
+			if len(args) > 1 {
+				args = args[1:]
+			}
+
+			if err := com.Handler(s, m, args...); err != nil {
+				cs.ErrorHandler(s, m, err)
+			}
 			return
 		}
 	}
@@ -111,17 +137,22 @@ func (cs *CommandSet) getHelpMessage() string {
 			desc = "missing description"
 		}
 
-		var example string
+		result.WriteString("\"")
+		result.WriteString(cleanPattern(cs.PrefixRe.String()))
+		result.WriteString(" ")
+		result.WriteString(com.Name)
 		if com.Example != "" {
-			example = com.Example
-		} else {
-			example = cleanPattern(com.Re.String())
+			result.WriteString(" ")
+			result.WriteString(com.Example)
 		}
+		result.WriteString("\"")
 
-		fmt.Fprintf(
-			&result, "\"%s %s\" Case Insensitive? %t, %s\n\n",
-			cleanPattern(cs.PrefixRe.String()), example, com.CaseInsensitive, desc,
+		result.WriteString(
+			fmt.Sprintf(" Case Insensitive? %t,", com.CaseInsensitive),
 		)
+		result.WriteString(" ")
+		result.WriteString(desc)
+		result.WriteString("\n\n")
 	}
 
 	return result.String()
