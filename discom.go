@@ -84,6 +84,13 @@ func (cs *CommandSet) Handler(s *discordgo.Session, m *discordgo.MessageCreate) 
 	}
 
 	msg = string(cs.PrefixRe.ReplaceAll([]byte(msg), []byte("")))
+	if len(msg) < 1 {
+		s.ChannelMessageSend(
+			m.ChannelID,
+			cs.replyMessage(m, "Missing command argument"),
+		)
+		return
+	}
 
 	args := strings.Split(msg[1:], " ")
 	if len(args) < 1 {
