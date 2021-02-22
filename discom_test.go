@@ -2,7 +2,6 @@ package discom
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -11,8 +10,8 @@ import (
 )
 
 func TestHelpMessage(t *testing.T) {
-	cs := CreateCommandSet(
-		regexp.MustCompile("test\\$"),
+	cs, _ := CreateCommandSet(
+		"test$",
 		func(*discordgo.Session, *discordgo.MessageCreate, error) {},
 	)
 
@@ -52,7 +51,7 @@ func TestHelpMessage(t *testing.T) {
 }
 
 func TestCallingHandler(t *testing.T) {
-	cs := CreateCommandSet(regexp.MustCompile("test\\$"), func(*discordgo.Session, *discordgo.MessageCreate, error) {})
+	cs, _ := CreateCommandSet("test$", func(*discordgo.Session, *discordgo.MessageCreate, error) {})
 
 	called := false
 	testHandler := func(*discordgo.Session, *discordgo.MessageCreate, ...string) error {
@@ -94,10 +93,13 @@ func TestCallingHandler(t *testing.T) {
 		},
 	}
 
+	//Test invalid call
 	msg := "test$ invalid"
 	testMessage.Content = msg
 	assert.Panics(
-		t, func() { cs.Handler(testSession, testMessage) },
+		t, func() {
+			cs.Handler(testSession, testMessage)
+		},
 		"The code did not panic",
 	)
 	called = false
@@ -105,12 +107,12 @@ func TestCallingHandler(t *testing.T) {
 	msg = "test$ nice"
 	testMessage.Content = msg
 	cs.Handler(testSession, testMessage)
-
 	if !called {
 		t.Errorf("testHandler not called by %s", msg)
 	}
 	called = false
 
+	//Test invalid call
 	msg = "test$ Nice"
 	testMessage.Content = msg
 	assert.Panics(
@@ -121,19 +123,30 @@ func TestCallingHandler(t *testing.T) {
 	)
 	called = false
 
+	//Test calling with some case issues
 	msg = "test$ very_nIce!"
 	testMessage.Content = msg
 	cs.Handler(testSession, testMessage)
-
 	if !called {
 		t.Errorf("testHandler called by %s should call case insensitive", msg)
 	}
+	called = false
+
+	//Test calling with no args
+	msg = "test$"
+	testMessage.Content = msg
+	assert.Panics(
+		t, func() {
+			cs.Handler(testSession, testMessage)
+		},
+		"The code did not panic",
+	)
 	called = false
 }
 
 func TestErrorHandler(t *testing.T) {
 	called := false
-	cs := CreateCommandSet(regexp.MustCompile("test\\$"), func(*discordgo.Session, *discordgo.MessageCreate, error) {
+	cs, _ := CreateCommandSet("test$", func(*discordgo.Session, *discordgo.MessageCreate, error) {
 		called = true
 	})
 
@@ -184,4 +197,65 @@ func TestErrorHandler(t *testing.T) {
 		t.Errorf("error handler called")
 	}
 	called = false
+}
+
+func TestValid(t *testing.T) {
+	cs, _ := CreateCommandSet("test$", func(*discordgo.Session, *discordgo.MessageCreate, error) {
+	})
+
+	testHandler := func(s *discordgo.Session, m *discordgo.MessageCreate, args ...string) error {
+		return nil
+	}
+
+	var err error
+	//Fails since Name is empty
+	err = cs.AddCommand(Command{
+		Handler:     testHandler,
+		Description: "nice a test handler",
+	})
+	if err == nil {
+		t.Error("error was nil")
+	}
+
+	//Fails since name conatins space
+	err = cs.AddCommand(Command{
+		Name:        "nice one",
+		Handler:     testHandler,
+		Description: "nice a test handler",
+	})
+	if err == nil {
+		t.Error("error was nil")
+	}
+
+	//Fails since name is help
+	err = cs.AddCommand(Command{
+		Name:        "help",
+		Handler:     testHandler,
+		Description: "nice a test handler",
+	})
+	if err == nil {
+		t.Error("error was nil")
+	}
+
+	//Fails since Name conatins Uppercase but CaseInsensitive is true
+	err = cs.AddCommand(Command{
+		Name:            "Nice",
+		Handler:         testHandler,
+		Description:     "nice a test handler",
+		CaseInsensitive: true,
+	})
+	if err == nil {
+		t.Error("error was nil")
+	}
+
+	//Fails since handler is nul
+	err = cs.AddCommand(Command{
+		Name:            "Nice",
+		Handler:         nil,
+		Description:     "nice a test handler",
+		CaseInsensitive: true,
+	})
+	if err == nil {
+		t.Error("error was nil")
+	}
 }

@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"regexp"
 	"strings"
 	"syscall"
 
@@ -14,25 +13,10 @@ import (
 )
 
 var (
-	prefixPattern string = "discom\\$"
-	discToken     string
-	commandSet    *discom.CommandSet
+	prefix     string = "discom$"
+	discToken  string
+	commandSet *discom.CommandSet
 )
-
-func init() {
-	discToken = strings.Replace(os.Getenv("DISCORD_AUTH"), "\"", "", -1)
-	commandSet = discom.CreateCommandSet(regexp.MustCompile(prefixPattern), errorHandler)
-
-	commandSet.AddCommand(discom.Command{
-		Name: "say hi", Handler: hiCommandHandler,
-		Description: "says hi",
-	})
-
-	commandSet.AddCommand(discom.Command{
-		Name: "say_bye", Handler: hiCommandHandler,
-		Description: "says bye",
-	})
-}
 
 func errorHandler(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
 	s.ChannelMessageSend(
@@ -53,6 +37,19 @@ func hiCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate, args ...
 }
 
 func main() {
+	discToken = strings.Replace(os.Getenv("DISCORD_AUTH"), "\"", "", -1)
+	commandSet, _ = discom.CreateCommandSet(prefix, errorHandler)
+
+	commandSet.AddCommand(discom.Command{
+		Name: "say hi", Handler: hiCommandHandler,
+		Description: "says hi",
+	})
+
+	commandSet.AddCommand(discom.Command{
+		Name: "say_bye", Handler: hiCommandHandler,
+		Description: "says bye",
+	})
+
 	discord, err := discordgo.New("Bot " + discToken)
 	if err != nil {
 		log.Printf("unable to create new discord instance")

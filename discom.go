@@ -1,10 +1,11 @@
 package discom
 
 import (
-	"errors"
 	"fmt"
-	"regexp"
 	"strings"
+	"unicode"
+
+	"github.com/pkg/errors"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -31,30 +32,58 @@ type Command struct {
 //CommandSet Use this to regsiter commands and get the handler to pass to discordgo.
 // This should be created with CreateCommandSet.
 type CommandSet struct {
-	PrefixRe     *regexp.Regexp
+	Prefix       string
 	ErrorHandler ErrorHandler
 	commands     []Command
 }
 
-var (
-	helpRe *regexp.Regexp
-)
-
 func init() {
-	helpRe = regexp.MustCompile("help")
 }
 
-func (c *Command) complete() bool {
-	return c.Name != "" && c.Handler != nil
+func isLower(s string) bool {
+	for _, r := range s {
+		if !unicode.IsLower(r) && unicode.IsLetter(r) {
+			return false
+		}
+	}
+	return true
+}
+
+func (c *Command) valid() error {
+	if c.Name == "" {
+		return fmt.Errorf("invalid name is empty")
+	}
+
+	if strings.Contains(c.Name, " ") {
+		return fmt.Errorf("invalid name conatins space")
+	}
+
+	if strings.ToLower(c.Name) == "help" {
+		return fmt.Errorf("invalid name cannot be help")
+	}
+
+	if c.CaseInsensitive && !isLower(c.Name) {
+		return fmt.Errorf("invalid name conatins uppercase while CaseInsensitive is true")
+	}
+
+	if c.Handler == nil {
+		return fmt.Errorf("invalid handler is nil")
+	}
+
+	return nil
 }
 
 //CreateCommandSet Creates a command set
-func CreateCommandSet(prefixRe *regexp.Regexp, errorHandler ErrorHandler) *CommandSet {
+func CreateCommandSet(prefix string, errorHandler ErrorHandler) (*CommandSet, error) {
+	if strings.Contains(prefix, " ") {
+		return nil, fmt.Errorf("invlaid prefix contains space")
+	}
+
 	return &CommandSet{
-		PrefixRe:     prefixRe,
+		Prefix:       prefix,
 		ErrorHandler: errorHandler,
 		commands:     []Command{},
-	}
+	}, nil
 }
 
 func cleanPattern(pattern string) string {
@@ -63,8 +92,8 @@ func cleanPattern(pattern string) string {
 
 //AddCommand Use this to add a command to a command set
 func (cs *CommandSet) AddCommand(com Command) error {
-	if !com.complete() {
-		return errors.New("Must set all fields in command struct")
+	if err := com.valid(); err != nil {
+		return errors.Wrap(err, "invlaid command")
 	}
 
 	cs.commands = append(cs.commands, com)
@@ -78,12 +107,16 @@ func (cs *CommandSet) Handler(s *discordgo.Session, m *discordgo.MessageCreate) 
 	}
 
 	msg := m.Content
-
-	if !cs.PrefixRe.Match([]byte(msg)) {
+	if len(msg) < len(cs.Prefix) {
 		return
 	}
 
-	msg = string(cs.PrefixRe.ReplaceAll([]byte(msg), []byte("")))
+	if msg[0:len(cs.Prefix)] != cs.Prefix {
+		return
+	}
+
+	//Remove prefix from message
+	msg = msg[len(cs.Prefix):]
 	if len(msg) < 1 {
 		s.ChannelMessageSend(
 			m.ChannelID,
@@ -120,10 +153,10 @@ func (cs *CommandSet) Handler(s *discordgo.Session, m *discordgo.MessageCreate) 
 	}
 
 	var res string
-	if helpRe.Match([]byte(msg)) {
+	if strings.ToLower(args[0]) == "help" {
 		res = cs.getHelpMessage()
 	} else {
-		res = fmt.Sprintf("unknown command try \"%s help\"", cs.PrefixRe.String())
+		res = fmt.Sprintf("unknown command try \"%s help\"", cs.Prefix)
 	}
 
 	s.ChannelMessageSend(
@@ -145,7 +178,7 @@ func (cs *CommandSet) getHelpMessage() string {
 		}
 
 		result.WriteString("\"")
-		result.WriteString(cleanPattern(cs.PrefixRe.String()))
+		result.WriteString(cleanPattern(cs.Prefix))
 		result.WriteString(" ")
 		result.WriteString(com.Name)
 		if com.Example != "" {
