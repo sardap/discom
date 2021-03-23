@@ -142,7 +142,11 @@ func (cs *CommandSet) Handler(s *discordgo.Session, m *discordgo.MessageCreate) 
 
 		if tmpMsg == com.Name {
 			if len(args) > 1 {
+				//Remove command from args list
 				args = args[1:]
+			} else {
+				//Clear args
+				args = make([]string, 0)
 			}
 
 			if err := com.Handler(s, m, args...); err != nil {
