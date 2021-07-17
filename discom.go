@@ -22,11 +22,16 @@ type Response struct {
 	Content string
 }
 
+type InteractionPayload struct {
+	Message  string
+	AuthorId string
+	GuildId  string
+}
+
 // Interaction any interfaction with the commands
 type Interaction interface {
 	Respond(*discordgo.Session, Response) error
-	GetMessage() string
-	GetAuthor() string
+	GetPayload() *InteractionPayload
 	Options() []*discordgo.ApplicationCommandInteractionDataOption
 }
 
@@ -140,12 +145,12 @@ func (d *discordInteraction) Options() []*discordgo.ApplicationCommandInteractio
 	return d.interaction.ApplicationCommandData().Options
 }
 
-func (d *discordInteraction) GetMessage() string {
-	return d.interaction.Message.Content
-}
-
-func (d *discordInteraction) GetAuthor() string {
-	return d.interaction.Member.User.ID
+func (d *discordInteraction) GetPayload() *InteractionPayload {
+	return &InteractionPayload{
+		Message:  d.interaction.Message.Content,
+		AuthorId: d.interaction.Member.User.ID,
+		GuildId:  d.interaction.GuildID,
+	}
 }
 
 func (d *discordInteraction) Respond(s *discordgo.Session, res Response) error {
@@ -175,12 +180,12 @@ func (d *discordMessage) Options() []*discordgo.ApplicationCommandInteractionDat
 	return d.options
 }
 
-func (d *discordMessage) GetMessage() string {
-	return d.message.Content
-}
-
-func (d *discordMessage) GetAuthor() string {
-	return d.message.Author.ID
+func (d *discordMessage) GetPayload() *InteractionPayload {
+	return &InteractionPayload{
+		Message:  d.message.Content,
+		AuthorId: d.message.Author.ID,
+		GuildId:  d.message.GuildID,
+	}
 }
 
 func (d *discordMessage) Respond(s *discordgo.Session, res Response) error {
