@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"syscall"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/sardap/discom"
@@ -18,21 +17,24 @@ var (
 	commandSet *discom.CommandSet
 )
 
-func errorHandler(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
-	s.ChannelMessageSend(
-		m.ChannelID,
-		fmt.Sprintf(
-			"<@%s> invalid command:\"%s\" error:%s",
-			m.Author.ID, m.Content, err,
+func errorHandler(s *discordgo.Session, i discom.Interaction, err error) {
+	i.Respond(s, discom.Response{
+		Content: fmt.Sprintf(
+			"invalid command:\"%s\" error:%s",
+			i.GetMessage(), err,
 		),
-	)
+	})
 }
 
-func hiCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate, args ...string) error {
-	s.ChannelMessageSend(
-		m.ChannelID,
-		fmt.Sprintf("<@%s> Hi", m.Author.ID),
-	)
+func hiCommandHandler(s *discordgo.Session, i discom.Interaction) error {
+	i.Respond(s, discom.Response{
+		Content: "processing",
+	})
+
+	i.Respond(s, discom.Response{
+		Content: fmt.Sprintf("<@%s> Hi", i.GetAuthor()),
+	})
+
 	return nil
 }
 
@@ -41,39 +43,68 @@ func main() {
 	commandSet, _ = discom.CreateCommandSet(prefix, errorHandler)
 
 	commandSet.AddCommand(discom.Command{
-		Name: "say hi", Handler: hiCommandHandler,
+		Name:        "say_hi",
+		Handler:     hiCommandHandler,
 		Description: "says hi",
 	})
 
 	commandSet.AddCommand(discom.Command{
-		Name: "say_bye", Handler: hiCommandHandler,
+		Name: "say_bye",
+		Handler: func(s *discordgo.Session, i discom.Interaction) error {
+			i.Respond(s, discom.Response{
+				Content: fmt.Sprintf("<@%s> Bye", i.GetAuthor()),
+			})
+
+			return nil
+		},
 		Description: "says bye",
 	})
 
-	discord, err := discordgo.New("Bot " + discToken)
+	commandSet.AddCommand(discom.Command{
+		Name: "option",
+		Handler: func(s *discordgo.Session, i discom.Interaction) error {
+			i.Respond(s, discom.Response{
+				Content: fmt.Sprintf("<@%s> %s", i.GetAuthor(), i.Options()[0].StringValue()),
+			})
+
+			return nil
+		},
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Name:        "bean",
+				Description: "cool",
+				Required:    true,
+				Type:        discordgo.ApplicationCommandOptionString,
+			},
+		},
+		Description: "says bye",
+	})
+
+	s, err := discordgo.New("Bot " + discToken)
 	if err != nil {
-		log.Printf("unable to create new discord instance")
-		log.Fatal(err)
+		log.Fatal("unable to create new discord instance ", err)
 	}
 
 	// Register the messageCreate func as a callback for MessageCreate events.
-	discord.AddHandler(commandSet.Handler)
+	s.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
+		s.UpdateListeningStatus("try discom$ or slash commands help")
+		log.Println("Bot is up!")
+	})
+
+	s.AddHandler(commandSet.Handler)
+	s.AddHandler(commandSet.IntreactionHandler)
 
 	// Open a websocket connection to Discord and begin listening.
-	err = discord.Open()
-	if err != nil {
-		fmt.Println("error opening connection,", err)
-		return
+	if err := s.Open(); err != nil {
+		log.Fatal("error opening connection,", err)
 	}
+	defer s.Close()
 
-	discord.UpdateStatus(1, "try discom$ help")
+	commandSet.SyncAppCommands(s)
 
 	// Wait here until CTRL-C or other term signal is received.
-	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
-	<-sc
-
-	// Cleanly close down the Discord session.
-	discord.Close()
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt)
+	<-stop
+	log.Println("Gracefully shutdowning")
 }

@@ -12,10 +12,10 @@ import (
 func TestHelpMessage(t *testing.T) {
 	cs, _ := CreateCommandSet(
 		"test$",
-		func(*discordgo.Session, *discordgo.MessageCreate, error) {},
+		func(*discordgo.Session, Interaction, error) {},
 	)
 
-	testHandler := func(*discordgo.Session, *discordgo.MessageCreate, ...string) error {
+	testHandler := func(*discordgo.Session, Interaction) error {
 		return nil
 	}
 
@@ -23,17 +23,15 @@ func TestHelpMessage(t *testing.T) {
 		Name:        "nice",
 		Handler:     testHandler,
 		Description: "nice a test handler",
-		Example:     "test",
 	})
 	if err != nil {
 		t.Error(err)
 	}
 
 	cs.AddCommand(Command{
-		Name:            "very_nice!",
-		Handler:         testHandler,
-		Description:     "very nice a test handler",
-		CaseInsensitive: true,
+		Name:        "very_nice!",
+		Handler:     testHandler,
+		Description: "very nice a test handler",
 	})
 	if err != nil {
 		t.Error(err)
@@ -41,39 +39,31 @@ func TestHelpMessage(t *testing.T) {
 
 	helpMsg := cs.getHelpMessage()
 
-	if expect := "\"test$ nice test\" Case Insensitive? false, nice a test handler"; !strings.Contains(helpMsg, expect) {
+	if expect := `"test$ nice" nice a test handler`; !strings.Contains(helpMsg, expect) {
 		t.Errorf("missmatch expected:%s to contain %s", helpMsg, expect)
 	}
 
-	if expect := "\"test$ very_nice!\" Case Insensitive? true, very nice a test handler"; !strings.Contains(helpMsg, expect) {
+	if expect := `"test$ very_nice!" very nice a test handler`; !strings.Contains(helpMsg, expect) {
 		t.Errorf("missmatch expected:%s to contain %s", helpMsg, expect)
 	}
 }
 
 func TestCallingHandler(t *testing.T) {
-	cs, _ := CreateCommandSet("test$", func(*discordgo.Session, *discordgo.MessageCreate, error) {})
+	cs, _ := CreateCommandSet("test$", func(*discordgo.Session, Interaction, error) {})
 
 	called := false
-	testHandler := func(*discordgo.Session, *discordgo.MessageCreate, ...string) error {
+	testHandler := func(*discordgo.Session, Interaction) error {
 		called = true
 		return nil
 	}
 
+	// Standard Call
 	err := cs.AddCommand(Command{
 		Name:        "nice",
 		Handler:     testHandler,
 		Description: "nice a test handler",
 	})
-	if err != nil {
-		t.Error(err)
-	}
-
-	cs.AddCommand(Command{
-		Name:            "very_nice!",
-		Handler:         testHandler,
-		Description:     "very nice a test handler",
-		CaseInsensitive: true,
-	})
+	assert.NoError(t, err)
 
 	testSession := &discordgo.Session{
 		State: &discordgo.State{
@@ -93,46 +83,14 @@ func TestCallingHandler(t *testing.T) {
 		},
 	}
 
-	//Test invalid call
-	msg := "test$ invalid"
-	testMessage.Content = msg
-	assert.Panics(
-		t, func() {
-			cs.Handler(testSession, testMessage)
-		},
-		"The code did not panic",
-	)
-	called = false
-
-	msg = "test$ nice"
+	// Test valid call
+	msg := "test$ nice"
 	testMessage.Content = msg
 	cs.Handler(testSession, testMessage)
-	if !called {
-		t.Errorf("testHandler not called by %s", msg)
-	}
+	assert.Truef(t, called, "testHandler not called by %s", msg)
 	called = false
 
-	//Test invalid call
-	msg = "test$ Nice"
-	testMessage.Content = msg
-	assert.Panics(
-		t, func() {
-			cs.Handler(testSession, testMessage)
-		},
-		"The code did not panic",
-	)
-	called = false
-
-	//Test calling with some case issues
-	msg = "test$ very_nIce!"
-	testMessage.Content = msg
-	cs.Handler(testSession, testMessage)
-	if !called {
-		t.Errorf("testHandler called by %s should call case insensitive", msg)
-	}
-	called = false
-
-	//Test calling with no args
+	// Test calling with no args
 	msg = "test$"
 	testMessage.Content = msg
 	assert.Panics(
@@ -145,13 +103,13 @@ func TestCallingHandler(t *testing.T) {
 }
 
 func TestErrorHandler(t *testing.T) {
-	called := false
-	cs, _ := CreateCommandSet("test$", func(*discordgo.Session, *discordgo.MessageCreate, error) {
-		called = true
+	errCalled := false
+	cs, _ := CreateCommandSet("test$", func(*discordgo.Session, Interaction, error) {
+		errCalled = true
 	})
 
-	testHandler := func(s *discordgo.Session, m *discordgo.MessageCreate, args ...string) error {
-		if args[0] == "bee" {
+	testHandler := func(s *discordgo.Session, i Interaction) error {
+		if i.Options()[0].StringValue() != "bee" {
 			return fmt.Errorf("hey cool")
 		}
 		return nil
@@ -161,10 +119,16 @@ func TestErrorHandler(t *testing.T) {
 		Name:        "nice",
 		Handler:     testHandler,
 		Description: "nice a test handler",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Name:        "moive",
+				Description: "bee moive",
+				Type:        discordgo.ApplicationCommandOptionString,
+				Required:    true,
+			},
+		},
 	})
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 
 	testSession := &discordgo.Session{
 		State: &discordgo.State{
@@ -184,26 +148,24 @@ func TestErrorHandler(t *testing.T) {
 		},
 	}
 
-	testMessage.Content = "test$ nice bee moive"
+	// No error
+	testMessage.Content = "test$ nice -moive bee"
 	cs.Handler(testSession, testMessage)
-	if !called {
-		t.Errorf("error handler not called")
-	}
-	called = false
+	assert.False(t, errCalled)
+	errCalled = false
 
-	testMessage.Content = "test$ nice moive"
+	// Error
+	testMessage.Content = "test$ nice -moive bae"
 	cs.Handler(testSession, testMessage)
-	if called {
-		t.Errorf("error handler called")
-	}
-	called = false
+	assert.True(t, errCalled)
+	errCalled = false
 }
 
 func TestValid(t *testing.T) {
-	cs, _ := CreateCommandSet("test$", func(*discordgo.Session, *discordgo.MessageCreate, error) {
+	cs, _ := CreateCommandSet("test$", func(*discordgo.Session, Interaction, error) {
 	})
 
-	testHandler := func(s *discordgo.Session, m *discordgo.MessageCreate, args ...string) error {
+	testHandler := func(*discordgo.Session, Interaction) error {
 		return nil
 	}
 
@@ -236,79 +198,57 @@ func TestValid(t *testing.T) {
 	if err == nil {
 		t.Error("error was nil")
 	}
-
-	//Fails since Name conatins Uppercase but CaseInsensitive is true
-	err = cs.AddCommand(Command{
-		Name:            "Nice",
-		Handler:         testHandler,
-		Description:     "nice a test handler",
-		CaseInsensitive: true,
-	})
-	if err == nil {
-		t.Error("error was nil")
-	}
-
-	//Fails since handler is nul
-	err = cs.AddCommand(Command{
-		Name:            "Nice",
-		Handler:         nil,
-		Description:     "nice a test handler",
-		CaseInsensitive: true,
-	})
-	if err == nil {
-		t.Error("error was nil")
-	}
 }
 
-func TestArgs(t *testing.T) {
-	cs, _ := CreateCommandSet("test$", func(*discordgo.Session, *discordgo.MessageCreate, error) {
-	})
+// func TestArgs(t *testing.T) {
+// 	cs, _ := CreateCommandSet("test$", func(*discordgo.Session, *discordgo.MessageCreate, error) {
+// 	})
 
-	argCount := 0
-	testHandler := func(s *discordgo.Session, m *discordgo.MessageCreate, args ...string) error {
-		argCount = len(args)
-		return nil
-	}
+// 	argCount := 0
+// 	testHandler := func(s *discordgo.Session, m *discordgo.MessageCreate, args ...string) error {
+// 		argCount = len(args)
+// 		return nil
+// 	}
 
-	cs.AddCommand(Command{
-		Name:        "nice",
-		Handler:     testHandler,
-		Description: "nice a test handler",
-	})
+// 	cs.AddCommand(Command{
+// 		Name:        "nice",
+// 		Handler:     testHandler,
+// 		Description: "nice a test handler",
+// 	})
 
-	testSession := &discordgo.Session{
-		State: &discordgo.State{
-			Ready: discordgo.Ready{
-				User: &discordgo.User{
-					ID: "botID",
-				},
-			},
-		},
-	}
+// 	testSession := &discordgo.Session{
+// 		State: &discordgo.State{
+// 			Ready: discordgo.Ready{
+// 				User: &discordgo.User{
+// 					ID: "botID",
+// 				},
+// 			},
+// 		},
+// 	}
 
-	testMessage := &discordgo.MessageCreate{
-		Message: &discordgo.Message{
-			Author: &discordgo.User{
-				ID: "messagerID",
-			},
-		},
-	}
+// 	testMessage := &discordgo.MessageCreate{
+// 		Message: &discordgo.Message{
+// 			Author: &discordgo.User{
+// 				ID: "messagerID",
+// 			},
+// 		},
+// 	}
 
-	//No args should be passed
-	msg := "test$ nice"
-	testMessage.Content = msg
-	cs.Handler(testSession, testMessage)
-	if argCount > 0 {
-		t.Errorf("arg passed when none should be")
-	}
-	argCount = 0
+// 	//No args should be passed
+// 	msg := "test$ nice"
+// 	testMessage.Content = msg
+// 	cs.Handler(testSession, testMessage)
+// 	if argCount > 0 {
+// 		t.Errorf("arg passed when none should be")
+// 	}
+// 	argCount = 0
 
-	//One arg should be passed
-	msg = "test$ nice very"
-	testMessage.Content = msg
-	cs.Handler(testSession, testMessage)
-	if argCount != 1 {
-		t.Errorf("1 arg should have been passed")
-	}
-	argCount = 0
-}
+// 	//One arg should be passed
+// 	msg = "test$ nice very"
+// 	testMessage.Content = msg
+// 	cs.Handler(testSession, testMessage)
+// 	if argCount != 1 {
+// 		t.Errorf("1 arg should have been passed")
+// 	}
+// 	argCount = 0
+// }
