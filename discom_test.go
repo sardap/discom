@@ -2,7 +2,6 @@ package discom
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/bwmarrin/discordgo"
@@ -19,33 +18,39 @@ func TestHelpMessage(t *testing.T) {
 		return nil
 	}
 
-	err := cs.AddCommand(Command{
+	assert.NoError(t, cs.AddCommand(Command{
 		Name:        "nice",
 		Handler:     testHandler,
 		Description: "nice a test handler",
-	})
-	if err != nil {
-		t.Error(err)
-	}
+	}))
 
-	cs.AddCommand(Command{
+	assert.NoError(t, cs.AddCommand(Command{
 		Name:        "very_nice!",
 		Handler:     testHandler,
 		Description: "very nice a test handler",
-	})
-	if err != nil {
-		t.Error(err)
-	}
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Name:        "required_flag",
+				Description: "required flag",
+				Required:    true,
+				Type:        discordgo.ApplicationCommandOptionString,
+			},
+			{
+				Name:        "optional_flag",
+				Description: "optional flag",
+				Required:    false,
+				Type:        discordgo.ApplicationCommandOptionInteger,
+			},
+		},
+	}))
 
 	helpMsg := cs.getHelpMessage()
 
-	if expect := `"test$ nice" nice a test handler`; !strings.Contains(helpMsg, expect) {
-		t.Errorf("missmatch expected:%s to contain %s", helpMsg, expect)
-	}
+	assert.Contains(t, helpMsg, `"test$ nice" nice a test handler`)
 
-	if expect := `"test$ very_nice!" very nice a test handler`; !strings.Contains(helpMsg, expect) {
-		t.Errorf("missmatch expected:%s to contain %s", helpMsg, expect)
-	}
+	assert.Contains(t, helpMsg, `"test$ very_nice!" very nice a test handler options`)
+	assert.Contains(t, helpMsg, `required_flag required flag required true type String`)
+	assert.Contains(t, helpMsg, `optional_flag optional flag required false type Integer`)
 }
 
 func TestCallingHandler(t *testing.T) {
