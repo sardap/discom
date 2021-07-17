@@ -114,7 +114,7 @@ func TestErrorHandler(t *testing.T) {
 	})
 
 	testHandler := func(s *discordgo.Session, i Interaction) error {
-		if i.Options()[0].StringValue() != "bee" {
+		if i.Option("moive").StringValue() != "bee" {
 			return fmt.Errorf("hey cool")
 		}
 		return nil
@@ -205,55 +205,86 @@ func TestValid(t *testing.T) {
 	}
 }
 
-// func TestArgs(t *testing.T) {
-// 	cs, _ := CreateCommandSet("test$", func(*discordgo.Session, *discordgo.MessageCreate, error) {
-// 	})
+func TestArgs(t *testing.T) {
+	cs, _ := CreateCommandSet("test$", func(*discordgo.Session, Interaction, error) {
+	})
 
-// 	argCount := 0
-// 	testHandler := func(s *discordgo.Session, m *discordgo.MessageCreate, args ...string) error {
-// 		argCount = len(args)
-// 		return nil
-// 	}
+	var b bool
+	var s string
+	var i int64
+	var opt string
+	testHandler := func(sess *discordgo.Session, inter Interaction) error {
+		b = inter.Option("bool").BoolValue()
+		s = inter.Option("string").StringValue()
+		i = inter.Option("int").IntValue()
+		if inter.Option("optional") != nil {
+			opt = inter.Option("optional").StringValue()
+		}
+		return nil
+	}
 
-// 	cs.AddCommand(Command{
-// 		Name:        "nice",
-// 		Handler:     testHandler,
-// 		Description: "nice a test handler",
-// 	})
+	cs.AddCommand(Command{
+		Name:        "nice",
+		Handler:     testHandler,
+		Description: "nice a test handler",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Name:        "bool",
+				Description: "bool",
+				Type:        discordgo.ApplicationCommandOptionBoolean,
+				Required:    true,
+			},
+			{
+				Name:        "string",
+				Description: "string",
+				Type:        discordgo.ApplicationCommandOptionString,
+				Required:    true,
+			},
+			{
+				Name:        "int",
+				Description: "int",
+				Type:        discordgo.ApplicationCommandOptionInteger,
+				Required:    true,
+			},
+			{
+				Name:        "optional",
+				Description: "optional",
+				Type:        discordgo.ApplicationCommandOptionString,
+				Required:    false,
+			},
+		},
+	})
 
-// 	testSession := &discordgo.Session{
-// 		State: &discordgo.State{
-// 			Ready: discordgo.Ready{
-// 				User: &discordgo.User{
-// 					ID: "botID",
-// 				},
-// 			},
-// 		},
-// 	}
+	testSession := &discordgo.Session{
+		State: &discordgo.State{
+			Ready: discordgo.Ready{
+				User: &discordgo.User{
+					ID: "botID",
+				},
+			},
+		},
+	}
 
-// 	testMessage := &discordgo.MessageCreate{
-// 		Message: &discordgo.Message{
-// 			Author: &discordgo.User{
-// 				ID: "messagerID",
-// 			},
-// 		},
-// 	}
+	testMessage := &discordgo.MessageCreate{
+		Message: &discordgo.Message{
+			Author: &discordgo.User{
+				ID: "messagerID",
+			},
+		},
+	}
 
-// 	//No args should be passed
-// 	msg := "test$ nice"
-// 	testMessage.Content = msg
-// 	cs.Handler(testSession, testMessage)
-// 	if argCount > 0 {
-// 		t.Errorf("arg passed when none should be")
-// 	}
-// 	argCount = 0
+	// test mandatory
+	msg := "test$ nice -bool true -string paul -int 69"
+	testMessage.Content = msg
+	cs.Handler(testSession, testMessage)
+	assert.Equal(t, true, b)
+	assert.Equal(t, "paul", s)
+	assert.Equal(t, int64(69), i)
+	assert.Equal(t, "", opt)
 
-// 	//One arg should be passed
-// 	msg = "test$ nice very"
-// 	testMessage.Content = msg
-// 	cs.Handler(testSession, testMessage)
-// 	if argCount != 1 {
-// 		t.Errorf("1 arg should have been passed")
-// 	}
-// 	argCount = 0
-// }
+	// One arg should be passed
+	msg = "test$ nice -bool true -string paul -int 69 -optional cool"
+	testMessage.Content = msg
+	cs.Handler(testSession, testMessage)
+	assert.Equal(t, "cool", opt)
+}

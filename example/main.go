@@ -21,7 +21,7 @@ func errorHandler(s *discordgo.Session, i discom.Interaction, err error) {
 	i.Respond(s, discom.Response{
 		Content: fmt.Sprintf(
 			"invalid command:\"%s\" error:%s",
-			i.GetMessage(), err,
+			i.GetPayload().Message, err,
 		),
 	})
 }
@@ -32,7 +32,7 @@ func hiCommandHandler(s *discordgo.Session, i discom.Interaction) error {
 	})
 
 	i.Respond(s, discom.Response{
-		Content: fmt.Sprintf("<@%s> Hi", i.GetAuthor()),
+		Content: fmt.Sprintf("<@%s> Hi", i.GetPayload().AuthorId),
 	})
 
 	return nil
@@ -52,7 +52,7 @@ func main() {
 		Name: "say_bye",
 		Handler: func(s *discordgo.Session, i discom.Interaction) error {
 			i.Respond(s, discom.Response{
-				Content: fmt.Sprintf("<@%s> Bye", i.GetAuthor()),
+				Content: fmt.Sprintf("<@%s> Bye", i.GetPayload().AuthorId),
 			})
 
 			return nil
@@ -64,7 +64,7 @@ func main() {
 		Name: "option",
 		Handler: func(s *discordgo.Session, i discom.Interaction) error {
 			i.Respond(s, discom.Response{
-				Content: fmt.Sprintf("<@%s> %s", i.GetAuthor(), i.Options()[0].StringValue()),
+				Content: fmt.Sprintf("<@%s> %s", i.GetPayload().AuthorId, i.Option("bean").StringValue()),
 			})
 
 			return nil

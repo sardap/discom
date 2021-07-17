@@ -32,7 +32,7 @@ type InteractionPayload struct {
 type Interaction interface {
 	Respond(*discordgo.Session, Response) error
 	GetPayload() *InteractionPayload
-	Options() []*discordgo.ApplicationCommandInteractionDataOption
+	Option(name string) *discordgo.ApplicationCommandInteractionDataOption
 }
 
 // CommandHandler A callback function which is triggered when a command is ran
@@ -114,10 +114,11 @@ func (c *Command) parseArgs(args []string) ([]*discordgo.ApplicationCommandInter
 		case discordgo.ApplicationCommandOptionString:
 			value = arg
 		case discordgo.ApplicationCommandOptionInteger:
-			value, err = strconv.ParseInt(arg, 10, 64)
+			intVal, err := strconv.ParseInt(arg, 10, 64)
 			if err != nil {
 				return nil, fmt.Errorf("expected %s to be an int but was given %s", optionsMap[cmd].Name, arg)
 			}
+			value = float64(intVal)
 		case discordgo.ApplicationCommandOptionBoolean:
 			value, err = strconv.ParseBool(arg)
 			if err != nil {
@@ -136,9 +137,27 @@ func (c *Command) parseArgs(args []string) ([]*discordgo.ApplicationCommandInter
 	return result, nil
 }
 
+func genOptionsMap(options []*discordgo.ApplicationCommandInteractionDataOption) map[string]*discordgo.ApplicationCommandInteractionDataOption {
+	result := make(map[string]*discordgo.ApplicationCommandInteractionDataOption)
+	for _, option := range options {
+		result[option.Name] = option
+	}
+
+	return result
+}
+
 type discordInteraction struct {
 	sent        bool
 	interaction *discordgo.Interaction
+	optionsMap  map[string]*discordgo.ApplicationCommandInteractionDataOption
+}
+
+func (d *discordInteraction) Option(name string) *discordgo.ApplicationCommandInteractionDataOption {
+	if d.optionsMap == nil {
+		d.optionsMap = genOptionsMap(d.interaction.ApplicationCommandData().Options)
+	}
+
+	return d.optionsMap[name]
 }
 
 func (d *discordInteraction) Options() []*discordgo.ApplicationCommandInteractionDataOption {
@@ -171,13 +190,18 @@ func (d *discordInteraction) Respond(s *discordgo.Session, res Response) error {
 }
 
 type discordMessage struct {
-	message *discordgo.Message
-	sentId  string
-	options []*discordgo.ApplicationCommandInteractionDataOption
+	message    *discordgo.Message
+	sentId     string
+	options    []*discordgo.ApplicationCommandInteractionDataOption
+	optionsMap map[string]*discordgo.ApplicationCommandInteractionDataOption
 }
 
-func (d *discordMessage) Options() []*discordgo.ApplicationCommandInteractionDataOption {
-	return d.options
+func (d *discordMessage) Option(name string) *discordgo.ApplicationCommandInteractionDataOption {
+	if d.optionsMap == nil {
+		d.optionsMap = genOptionsMap(d.options)
+	}
+
+	return d.optionsMap[name]
 }
 
 func (d *discordMessage) GetPayload() *InteractionPayload {
