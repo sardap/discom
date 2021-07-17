@@ -165,11 +165,16 @@ func (d *discordInteraction) Options() []*discordgo.ApplicationCommandInteractio
 }
 
 func (d *discordInteraction) GetPayload() *InteractionPayload {
-	return &InteractionPayload{
-		Message:  d.interaction.Message.Content,
+	result := &InteractionPayload{
 		AuthorId: d.interaction.Member.User.ID,
 		GuildId:  d.interaction.GuildID,
 	}
+
+	if d.interaction.Message != nil {
+		result.Message = d.interaction.Message.Content
+	}
+
+	return result
 }
 
 func (d *discordInteraction) Respond(s *discordgo.Session, res Response) error {
