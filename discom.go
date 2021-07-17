@@ -222,18 +222,18 @@ func (c *Command) valid() error {
 		return fmt.Errorf("invalid handler is nil")
 	}
 
-	requiredStarted := false
+	requiredCompleted := false
 	for _, option := range c.Options {
 		if option.Name == "" {
 			return fmt.Errorf("all options must have a name")
 		}
 
-		if requiredStarted {
-			if !option.Required {
+		if requiredCompleted {
+			if option.Required {
 				return fmt.Errorf("requires must be sequential")
 			}
-		} else if option.Required {
-			requiredStarted = true
+		} else if !option.Required {
+			requiredCompleted = true
 		}
 	}
 
@@ -425,6 +425,22 @@ func (cs *CommandSet) getHelpMessage() string {
 		result.WriteString("\"")
 		result.WriteString(" ")
 		result.WriteString(desc)
+		if len(com.Options) > 0 {
+			result.WriteString(" options\n")
+		}
+
+		for _, option := range com.Options {
+			result.WriteString("\t")
+			result.WriteString(option.Name)
+			result.WriteString(" ")
+			result.WriteString(option.Description)
+			result.WriteString(" required ")
+			result.WriteString(strconv.FormatBool(option.Required))
+			result.WriteString(" type ")
+			result.WriteString(ApplicationCommandOptionToString(option.Type))
+			result.WriteString("\n")
+		}
+
 		result.WriteString("\n\n")
 	}
 
@@ -433,4 +449,29 @@ func (cs *CommandSet) getHelpMessage() string {
 
 func (cs *CommandSet) replyMessage(m *discordgo.MessageCreate, response string) string {
 	return fmt.Sprintf("<@%s> %s", m.Author.ID, response)
+}
+
+func ApplicationCommandOptionToString(option discordgo.ApplicationCommandOptionType) string {
+	switch option {
+	case discordgo.ApplicationCommandOptionSubCommand:
+		return "Sub Command"
+	case discordgo.ApplicationCommandOptionSubCommandGroup:
+		return "Command Grouup"
+	case discordgo.ApplicationCommandOptionString:
+		return "String"
+	case discordgo.ApplicationCommandOptionInteger:
+		return "Integer"
+	case discordgo.ApplicationCommandOptionBoolean:
+		return "Boolean"
+	case discordgo.ApplicationCommandOptionUser:
+		return "User"
+	case discordgo.ApplicationCommandOptionChannel:
+		return "Channel"
+	case discordgo.ApplicationCommandOptionRole:
+		return "Role"
+	case discordgo.ApplicationCommandOptionMentionable:
+		return "Mentionable"
+	}
+
+	return ""
 }
