@@ -178,11 +178,18 @@ func (d *discordInteraction) GetPayload() *InteractionPayload {
 }
 
 func (d *discordInteraction) Respond(s *discordgo.Session, res Response) error {
+	body := res.Content
+	if len(res.Content) >= 2000 {
+		left, right := body[0:1999], body[2000:len(body)-1]
+		defer d.Respond(s, Response{Content: right})
+		body = left
+	}
+
 	if !d.sent {
 		err := s.InteractionRespond(d.interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: res.Content,
+				Content: body,
 			},
 		})
 		d.sent = err == nil
@@ -190,7 +197,7 @@ func (d *discordInteraction) Respond(s *discordgo.Session, res Response) error {
 	}
 
 	return s.InteractionResponseEdit(s.State.User.ID, d.interaction, &discordgo.WebhookEdit{
-		Content: res.Content,
+		Content: body,
 	})
 }
 
@@ -218,15 +225,22 @@ func (d *discordMessage) GetPayload() *InteractionPayload {
 }
 
 func (d *discordMessage) Respond(s *discordgo.Session, res Response) error {
+	body := res.Content
+	if len(res.Content) >= 2000 {
+		left, right := body[0:1999], body[2000:len(body)-1]
+		defer d.Respond(s, Response{Content: right})
+		body = left
+	}
+
 	if d.sentId == "" {
-		msg, err := s.ChannelMessageSend(d.message.ChannelID, res.Content)
+		msg, err := s.ChannelMessageSend(d.message.ChannelID, body)
 		if err == nil {
 			d.sentId = msg.ID
 		}
 		return err
 	}
 
-	_, err := s.ChannelMessageEdit(d.message.ChannelID, d.sentId, res.Content)
+	_, err := s.ChannelMessageEdit(d.message.ChannelID, d.sentId, body)
 	return err
 }
 
