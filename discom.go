@@ -23,9 +23,10 @@ type Response struct {
 }
 
 type InteractionPayload struct {
-	Message  string
-	AuthorId string
-	GuildId  string
+	Message   string
+	AuthorId  string
+	GuildId   string
+	ChannelId string
 }
 
 // Interaction any interfaction with the commands
@@ -166,8 +167,9 @@ func (d *discordInteraction) Options() []*discordgo.ApplicationCommandInteractio
 
 func (d *discordInteraction) GetPayload() *InteractionPayload {
 	result := &InteractionPayload{
-		AuthorId: d.interaction.Member.User.ID,
-		GuildId:  d.interaction.GuildID,
+		AuthorId:  d.interaction.Member.User.ID,
+		GuildId:   d.interaction.GuildID,
+		ChannelId: d.interaction.ChannelID,
 	}
 
 	if d.interaction.Message != nil {
@@ -218,9 +220,10 @@ func (d *discordMessage) Option(name string) *discordgo.ApplicationCommandIntera
 
 func (d *discordMessage) GetPayload() *InteractionPayload {
 	return &InteractionPayload{
-		Message:  d.message.Content,
-		AuthorId: d.message.Author.ID,
-		GuildId:  d.message.GuildID,
+		Message:   d.message.Content,
+		AuthorId:  d.message.Author.ID,
+		GuildId:   d.message.GuildID,
+		ChannelId: d.message.ChannelID,
 	}
 }
 
