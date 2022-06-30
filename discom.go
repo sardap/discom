@@ -198,9 +198,11 @@ func (d *discordInteraction) Respond(s *discordgo.Session, res Response) error {
 		return err
 	}
 
-	return s.InteractionResponseEdit(s.State.User.ID, d.interaction, &discordgo.WebhookEdit{
+	_, err := s.InteractionResponseEdit(d.interaction, &discordgo.WebhookEdit{
 		Content: body,
 	})
+
+	return err
 }
 
 type discordMessage struct {
