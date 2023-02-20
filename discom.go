@@ -199,7 +199,7 @@ func (d *discordInteraction) Respond(s *discordgo.Session, res Response) error {
 	}
 
 	_, err := s.InteractionResponseEdit(d.interaction, &discordgo.WebhookEdit{
-		Content: body,
+		Content: &body,
 	})
 
 	return err
