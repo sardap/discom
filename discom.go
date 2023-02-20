@@ -132,6 +132,7 @@ func (c *Command) parseArgs(args []string) ([]*discordgo.ApplicationCommandInter
 		result = append(result, &discordgo.ApplicationCommandInteractionDataOption{
 			Name:  optionsMap[cmd].Name,
 			Value: value,
+			Type:  optionsMap[cmd].Type,
 		})
 	}
 
@@ -377,7 +378,7 @@ func (cs *CommandSet) AddCommand(com Command) error {
 	return nil
 }
 
-// Handler Regsiter this with discordgo.AddHandler will be called every time a new message is sent on a guild.
+// Handler Register this with discordgo.AddHandler will be called every time a new message is sent on a guild.
 func (cs *CommandSet) Handler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return
