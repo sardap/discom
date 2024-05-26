@@ -1,9 +1,9 @@
 module github.com/sardap/discom
 
-go 1.19
+go 1.21
 
 require (
-	github.com/bwmarrin/discordgo v0.27.0
+	github.com/bwmarrin/discordgo v0.28.1
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.0
 )
